@@ -1,15 +1,21 @@
+```dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:rive/rive.dart' hide Image;
+import 'package:rive/rive' hide Image;
 import 'package:image_picker/image_picker.dart';
-import 'widgets/history_drawer.dart';
-import 'widgets/bouncy_button.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+
+import 'widgets/bouncy_button.dart';
 import 'widgets/result_sheet.dart';
+import 'widgets/history_drawer.dart';
 
 void main() {
   runApp(const AiSpyApp());
 }
+
+final ValueNotifier<Locale> appLocale = ValueNotifier(const Locale('en'));
 
 // ... unchanged AiSpyApp ...
 
@@ -18,17 +24,25 @@ class AiSpyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'AI Spy',
-      theme: ThemeData(
-        fontFamily: 'Quicksand', // Fallback to system sans if not added
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF8E7BFF),
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-      ),
-      home: const MascotDetectorScreen(),
+    return ValueListenableBuilder<Locale>(
+      valueListenable: appLocale,
+      builder: (context, locale, child) {
+        return MaterialApp(
+          title: 'AI Spy',
+          locale: locale,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: ThemeData(
+            fontFamily: 'Quicksand',
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFF8E7BFF),
+              brightness: Brightness.light,
+            ),
+            useMaterial3: true,
+          ),
+          home: const MascotDetectorScreen(),
+        );
+      },
     );
   }
 }
@@ -48,7 +62,7 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> {
   RiveWidgetController? _riveController;
 
   bool _isLoading = false;
-  String _resultText = "Our goofy friend is waiting for your photo...";
+  String? _resultText; // Set to null initially to allow translation lookup in build()
 
   @override
   void initState() {
@@ -100,7 +114,7 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> {
         onClose: () {
           Navigator.pop(context);
           setState(() {
-            _resultText = "Ready for the next scan!";
+            _resultText = null; // Will fallback to waitingText
           });
         },
       ),
@@ -113,7 +127,7 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> {
 
     setState(() {
       _isLoading = true;
-      _resultText = "Scanning pixels... sweat is dropping...";
+      _resultText = AppLocalizations.of(context)!.scanningText;
     });
     // For character or similar files we guess input names:
     _triggerInput('bool', 'isChecking', true);
@@ -151,11 +165,11 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> {
           if (isFake) {
             _triggerInput('trigger', 'fail', null);
             _triggerInput('trigger', 'shocked', null);
-            _resultText = "🔥 FAKE ALERT! 88% AI Generated! 🔥";
+            _resultText = AppLocalizations.of(context)!.fakeToast;
           } else {
             _triggerInput('trigger', 'success', null);
             _triggerInput('trigger', 'approved', null);
-            _resultText = "✅ Pure natural origin confirmed!";
+            _resultText = AppLocalizations.of(context)!.realToast;
           }
         });
         
@@ -173,7 +187,7 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> {
           _triggerInput('bool', 'isScanning', false);
           _triggerInput('trigger', 'fail', null);
           _triggerInput('trigger', 'confused', null);
-        _resultText = "Backend Error: $e";
+        _resultText = "\${AppLocalizations.of(context)!.backendError} $e";
       });
     } finally {
       setState(() {
@@ -209,8 +223,9 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> {
   }
 
 // ... in build ...
-  @override
-  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    String displayText = _resultText ?? l10n.waitingText;
+
     return Scaffold(
       backgroundColor: const Color(0xFFE8F0FF), // Soft background
       drawer: HistoryDrawer(onRestorePurchases: _handleRestorePurchases),
@@ -265,7 +280,21 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 32), // Balance layout for the menu icon
+                      
+                      // Language Toggle (EN/ZH)
+                      Builder(
+                        builder: (context) => IconButton(
+                          icon: const Icon(Icons.language, color: Colors.indigo, size: 28),
+                          onPressed: () {
+                            // Toggle between en and zh
+                            if (appLocale.value.languageCode == 'en') {
+                              appLocale.value = const Locale('zh');
+                            } else {
+                              appLocale.value = const Locale('en');
+                            }
+                          },
+                        ),
+                      ),
                     ]
                   ),
                 ),
@@ -281,9 +310,9 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
-                            "Drop it in the Truth Machine",
-                            style: TextStyle(
+                          Text(
+                            l10n.dropPhotoTitle,
+                            style: const TextStyle(
                               fontSize: 18, 
                               fontWeight: FontWeight.bold,
                               color: Colors.black87
@@ -303,9 +332,9 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> {
                                 child: ElevatedButton.icon(
                                   onPressed: () {},
                                   icon: const Icon(Icons.photo_library),
-                                  label: const Text(
-                                    "Choose Photo", 
-                                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+                                  label: Text(
+                                    l10n.choosePhoto, 
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
                                   ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
@@ -333,7 +362,7 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> {
                               child: TextButton.icon(
                                 onPressed: () {},
                                 icon: const Icon(Icons.camera_alt, color: Colors.black54),
-                                label: const Text("Take a Picture", style: TextStyle(color: Colors.black54)),
+                                label: Text(l10n.takePicture, style: const TextStyle(color: Colors.black54)),
                               ),
                             ),
                           )
@@ -364,7 +393,7 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              _resultText,
+                              displayText,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                                 color: Colors.black87

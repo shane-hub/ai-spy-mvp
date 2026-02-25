@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class HistoryDrawer extends StatelessWidget {
   final VoidCallback onRestorePurchases;
@@ -11,6 +12,8 @@ class HistoryDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    
     return Drawer(
       backgroundColor: Colors.transparent,
       child: ClipRRect(
@@ -31,15 +34,15 @@ class HistoryDrawer extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                   const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                   Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
                     child: Row(
                       children: [
-                         Icon(Icons.history, color: Colors.indigo, size: 28),
-                         SizedBox(width: 12),
+                         const Icon(Icons.history, color: Colors.indigo, size: 28),
+                         const SizedBox(width: 12),
                          Text(
-                           "History", 
-                           style: TextStyle(
+                           l10n.historyTitle, 
+                           style: const TextStyle(
                               fontSize: 24, 
                               fontWeight: FontWeight.w900,
                               color: Colors.indigo
@@ -55,16 +58,16 @@ class HistoryDrawer extends StatelessWidget {
                     child: ListView(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       children: [
-                        _buildHistoryItem("Just Now", "🚨 FAKE ALERT", "88.0%", Colors.red),
-                        _buildHistoryItem("2 hrs ago", "✅ ORGANIC", "92.1%", Colors.green),
-                        _buildHistoryItem("Yesterday", "🚨 FAKE ALERT", "99.9%", Colors.red),
+                        _buildHistoryItem(l10n.historyTimeJustNow, l10n.fakeAlertTitle, "88.0%", Colors.red),
+                        _buildHistoryItem(l10n.historyTime2Hrs, l10n.organicTitle, "92.1%", Colors.green),
+                        _buildHistoryItem(l10n.historyTimeYesterday, l10n.fakeAlertTitle, "99.9%", Colors.red),
                         
-                        const Padding(
-                          padding: EdgeInsets.all(24.0),
+                        Padding(
+                          padding: const EdgeInsets.all(24.0),
                           child: Text(
-                            "History is stored only on this device.",
+                            l10n.historyLocalDisclaimer,
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 12, color: Colors.black45),
+                            style: const TextStyle(fontSize: 12, color: Colors.black45),
                           ),
                         )
                       ],
@@ -88,7 +91,7 @@ class HistoryDrawer extends StatelessWidget {
                             onRestorePurchases();
                           },
                           icon: const Icon(Icons.restore),
-                          label: const Text("Restore Purchases"),
+                          label: Text(l10n.restorePurchases),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.indigo.shade50,
                             foregroundColor: Colors.indigo,
@@ -99,10 +102,10 @@ class HistoryDrawer extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        const Text(
-                          "AI-Spy MVP v1.0\nBuilt for truth.",
+                        Text(
+                          l10n.appVersionLabel,
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 11, color: Colors.black45),
+                          style: const TextStyle(fontSize: 11, color: Colors.black45),
                         )
                       ],
                     ),
