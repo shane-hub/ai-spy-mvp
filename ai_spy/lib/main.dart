@@ -1,0 +1,409 @@
+import 'dart:ui';
+import 'package:flutter/material.dart';
+import 'package:rive/rive.dart' hide Image;
+import 'package:image_picker/image_picker.dart';
+import 'widgets/history_drawer.dart';
+import 'widgets/bouncy_button.dart';
+import 'package:http/http.dart' as http;
+import 'widgets/result_sheet.dart';
+
+void main() {
+  runApp(const AiSpyApp());
+}
+
+// ... unchanged AiSpyApp ...
+
+class AiSpyApp extends StatelessWidget {
+  const AiSpyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'AI Spy',
+      theme: ThemeData(
+        fontFamily: 'Quicksand', // Fallback to system sans if not added
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF8E7BFF),
+          brightness: Brightness.light,
+        ),
+        useMaterial3: true,
+      ),
+      home: const MascotDetectorScreen(),
+    );
+  }
+}
+
+class MascotDetectorScreen extends StatefulWidget {
+  const MascotDetectorScreen({super.key});
+
+  @override
+  State<MascotDetectorScreen> createState() => _MascotDetectorScreenState();
+}
+
+class _MascotDetectorScreenState extends State<MascotDetectorScreen> {
+  final ImagePicker _picker = ImagePicker();
+  
+  // Rive 0.14 loader and controllers
+  File? _riveFile;
+  RiveWidgetController? _riveController;
+
+  bool _isLoading = false;
+  String _resultText = "Our goofy friend is waiting for your photo...";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMascot();
+  }
+
+  Future<void> _loadMascot() async {
+    try {
+      _riveFile = await File.asset(
+        'assets/zombie.riv',
+        riveFactory: Factory.rive,
+      );
+      _riveController = RiveWidgetController(_riveFile!);
+      setState(() {});
+    } catch (e) {
+      print("Failed to load mascot: $e");
+    }
+  }
+
+  void _triggerInput(String type, String name, dynamic value) {
+    if (_riveController == null) return;
+    try {
+      if (type == 'bool') {
+        _riveController!.stateMachine.boolean(name)?.value = value as bool;
+      } else if (type == 'trigger') {
+        _riveController!.stateMachine.trigger(name)?.fire();
+      }
+    } catch (_) {
+      // Input not found or state machine absent
+    }
+  }
+
+  void _showResultSheet(bool isFake, double confidence) {
+     showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ResultSheet(
+        isFake: isFake,
+        confidence: confidence,
+        onUnlock: () {
+          // TODO: Impl IAP
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Mock IAP: Unlocked! ✨'))
+          );
+        },
+        onClose: () {
+          Navigator.pop(context);
+          setState(() {
+            _resultText = "Ready for the next scan!";
+          });
+        },
+      ),
+    );
+  }
+
+  Future<void> _pickAndAnalyzeImage(ImageSource source) async {
+    final XFile? image = await _picker.pickImage(source: source);
+    if (image == null) return;
+
+    setState(() {
+      _isLoading = true;
+      _resultText = "Scanning pixels... sweat is dropping...";
+    });
+    // For character or similar files we guess input names:
+    _triggerInput('bool', 'isChecking', true);
+    _triggerInput('bool', 'isScanning', true);
+
+    try {
+      var request = http.MultipartRequest(
+        'POST', 
+        Uri.parse('http://localhost:3001/api/v1/detect')
+      );
+      
+      request.fields['auth_token'] = 'my_super_secure_client_secret_for_flutter';
+      var multipartFile = await http.MultipartFile.fromPath('image', image.path);
+      request.files.add(multipartFile);
+
+      var response = await request.send();
+      
+      if (response.statusCode == 200) {
+        String responseStr = await response.stream.bytesToString();
+        bool isFake = responseStr.contains('"is_fake":true'); 
+        
+        // Extract mock confidence score we built in the backend
+        double confidence = 0.88; // Default fallback
+        try {
+           final regex = RegExp(r'"confidence_score":([0-9.]+)');
+           final match = regex.firstMatch(responseStr);
+           if (match != null) {
+              confidence = double.parse(match.group(1)!);
+           }
+        } catch (_) {}
+
+        setState(() {
+          _triggerInput('bool', 'isChecking', false);
+          _triggerInput('bool', 'isScanning', false);
+          if (isFake) {
+            _triggerInput('trigger', 'fail', null);
+            _triggerInput('trigger', 'shocked', null);
+            _resultText = "🔥 FAKE ALERT! 88% AI Generated! 🔥";
+          } else {
+            _triggerInput('trigger', 'success', null);
+            _triggerInput('trigger', 'approved', null);
+            _resultText = "✅ Pure natural origin confirmed!";
+          }
+        });
+        
+        // POP THE SHEET
+        _showResultSheet(isFake, confidence);
+        
+      } else {
+        String respBody = await response.stream.bytesToString();
+        throw Exception("HTTP ${response.statusCode}: $respBody");
+      }
+    } catch (e) {
+      print("Upload Error Caught: $e");
+      setState(() {
+          _triggerInput('bool', 'isChecking', false);
+          _triggerInput('bool', 'isScanning', false);
+          _triggerInput('trigger', 'fail', null);
+          _triggerInput('trigger', 'confused', null);
+        _resultText = "Backend Error: $e";
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _riveController?.dispose();
+    _riveFile?.dispose();
+    super.dispose();
+  }
+
+// add import at top of main.dart
+  void _handleRestorePurchases() {
+    // Show a mock loading indicator and then success
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+    Future.delayed(const Duration(seconds: 2), () {
+      Navigator.pop(context); // close dialog
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Purchases Restored Successfully!'),
+          backgroundColor: Colors.green,
+        )
+      );
+    });
+  }
+
+// ... in build ...
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFE8F0FF), // Soft background
+      drawer: HistoryDrawer(onRestorePurchases: _handleRestorePurchases),
+      body: Stack(
+        children: [
+          // 1. BACKGROUND MASCOT LAYER (Rive 0.14)
+          Positioned.fill(
+            child: _riveController == null 
+              ? const Center(child: CircularProgressIndicator())
+              : RiveWidget(
+                  controller: _riveController!,
+                  fit: Fit.cover,
+                ),
+          ),
+          
+          // 2. FOREGROUND GLASSMORPHISM UI LAYER
+          SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: 20),
+                // Title App Bar Glass
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Drawer Button (Menu)
+                      Builder(
+                        builder: (context) => IconButton(
+                          icon: const Icon(Icons.menu, color: Colors.indigo, size: 32),
+                          onPressed: () => Scaffold.of(context).openDrawer(),
+                        ),
+                      ),
+                      
+                      _buildGlassContainer(
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.troubleshoot, color: Colors.indigo),
+                              SizedBox(width: 8),
+                              Text(
+                                'AI-Spy (MVP)',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.indigo,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 32), // Balance layout for the menu icon
+                    ]
+                  ),
+                ),
+                
+                const Spacer(),
+                
+                // Upload Card Glass
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: _buildGlassContainer(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            "Drop it in the Truth Machine",
+                            style: TextStyle(
+                              fontSize: 18, 
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          
+                          // Big Upload Button
+                          BouncyButton(
+                            onPressed: _isLoading 
+                                ? null 
+                                : () => _pickAndAnalyzeImage(ImageSource.gallery),
+                            child: SizedBox(
+                              width: double.infinity,
+                              height: 60,
+                              child: AbsorbPointer( // Stop Flutter's internal ripple from stealing the pointer
+                                child: ElevatedButton.icon(
+                                  onPressed: () {},
+                                  icon: const Icon(Icons.photo_library),
+                                  label: const Text(
+                                    "Choose Photo", 
+                                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: const Color(0xFF8E7BFF),
+                                    elevation: 8,
+                                    shadowColor: const Color(0xFF8E7BFF).withOpacity(0.5),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20)
+                                    )
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 12),
+                          
+// ... replacement in the build method ...
+                          // Camera Button
+                          BouncyButton(
+                            onPressed: _isLoading 
+                                ? null 
+                                : () => _pickAndAnalyzeImage(ImageSource.camera),
+                            child: AbsorbPointer(
+                              child: TextButton.icon(
+                                onPressed: () {},
+                                icon: const Icon(Icons.camera_alt, color: Colors.black54),
+                                label: const Text("Take a Picture", style: TextStyle(color: Colors.black54)),
+                              ),
+                            ),
+                          )
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Status / Reaction Bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: _buildGlassContainer(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        children: [
+                          if (_isLoading) 
+                            const SizedBox(
+                              width: 20, height: 20, 
+                              child: CircularProgressIndicator(strokeWidth: 2)
+                            )
+                          else
+                            const Icon(Icons.info_outline, color: Colors.deepPurple),
+                          
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _resultText,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87
+                              ),
+                            ),
+                          )
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 48), // Bottom padding
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  // Reusable Glassmorphism Container Widget
+  Widget _buildGlassContainer({required Widget child}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(32),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.5),
+              width: 1.5,
+            ),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}

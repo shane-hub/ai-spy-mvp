@@ -1,0 +1,14 @@
+node_modules/
+.DS_Store
+*.log
+.env
+
+# Flutter / Dart
+.dart_tool/
+build/
+.pub-cache/
+.pub/
+/build/
+*.DS_Store
+ios/.symlinks/
+ios/Pods/
