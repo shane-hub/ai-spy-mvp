@@ -37,25 +37,24 @@ router.post('/detect', upload.single('image'), async (req: Request, res: Respons
             contentType: req.file.mimetype,
         });
 
-        // 4. 发起实际调用 (MOCKED FOR MVP TESTING)
-        // const sightengineResponse = await axios.post('https://api.sightengine.com/1.0/check.json', data, {
-        //     headers: { ...data.getHeaders() }
-        // });
-        // const result = sightengineResponse.data;
+        // 4. 发起实际调用 (Live Sightengine Integration)
+        const sightengineResponse = await axios.post('https://api.sightengine.com/1.0/check.json', data, {
+            headers: { ...data.getHeaders() }
+        });
+        const result = sightengineResponse.data;
 
-        // 模拟 API 延迟 (1.5秒) 和随机判定
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        const mockScore = Math.random(); // 0 to 1
-        const isFake = mockScore > 0.5;
+        // Sightengine's 'genai' model returns an 'ai_generated' probability score
+        const aiScore = result.type?.ai_generated || 0;
+        const isFake = aiScore > 0.5; // We consider anything > 0.5 as fake
 
         res.status(200).json({
             code: 200,
             msg: 'success',
             data: {
                 is_fake: isFake,
-                confidence_score: mockScore,
+                confidence_score: aiScore,
                 verdict_code: isFake ? 'HIGH_AI_PROBABILITY' : 'NATURAL',
-                raw_analysis: { simulated: true, original_score: mockScore }
+                raw_analysis: result
             }
         });
 
