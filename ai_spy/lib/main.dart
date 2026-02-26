@@ -1,11 +1,10 @@
-```dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:rive/rive' hide Image;
+import 'l10n/app_localizations.dart';
+import 'package:rive/rive.dart' hide Image;
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 import 'widgets/bouncy_button.dart';
 import 'widgets/result_sheet.dart';
@@ -222,7 +221,8 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> {
     });
   }
 
-// ... in build ...
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     String displayText = _resultText ?? l10n.waitingText;
 

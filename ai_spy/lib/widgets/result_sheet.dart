@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import '../l10n/app_localizations.dart';
 import 'bouncy_button.dart';
 
 class ResultSheet extends StatelessWidget {
@@ -67,9 +67,9 @@ class ResultSheet extends StatelessWidget {
 
               // Deep Analysis / Heatmap / Paywall
               if (isDanger) 
-                _buildPaywallBox(primaryColor)
+                _buildPaywallBox(context, primaryColor)
               else 
-                 _buildShareBox(primaryColor),
+                 _buildShareBox(context, primaryColor),
               
               const SizedBox(height: 24),
               TextButton(
@@ -83,7 +83,7 @@ class ResultSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildPaywallBox(Color themeColor) {
+  Widget _buildPaywallBox(BuildContext context, Color themeColor) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -165,7 +165,7 @@ class ResultSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildShareBox(Color themeColor) {
+  Widget _buildShareBox(BuildContext context, Color themeColor) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
