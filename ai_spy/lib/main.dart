@@ -146,7 +146,7 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> with Single
     try {
       var request = http.MultipartRequest(
         'POST', 
-        Uri.parse('http://192.168.3.44:3001/api/v1/detect')
+        Uri.parse('https://ai-spy-3owq.onrender.com/api/v1/detect')
       );
       
       request.fields['auth_token'] = 'my_super_secure_client_secret_for_flutter';
