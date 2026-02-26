@@ -1,7 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'l10n/app_localizations.dart';
-import 'package:rive/rive.dart' hide Image;
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -53,49 +52,50 @@ class MascotDetectorScreen extends StatefulWidget {
   State<MascotDetectorScreen> createState() => _MascotDetectorScreenState();
 }
 
-class _MascotDetectorScreenState extends State<MascotDetectorScreen> {
+class _MascotDetectorScreenState extends State<MascotDetectorScreen> with SingleTickerProviderStateMixin {
   final ImagePicker _picker = ImagePicker();
   
-  // Rive 0.14 loader and controllers
-  File? _riveFile;
-  RiveWidgetController? _riveController;
+  late AnimationController _animController;
+  late Animation<double> _breatheAnimation;
+  late Animation<double> _floatAnimation;
 
   bool _isLoading = false;
   String? _resultText; // Set to null initially to allow translation lookup in build()
+  bool _isFakeResult = false;
+  bool _hasResult = false;
 
   @override
   void initState() {
     super.initState();
-    _loadMascot();
-  }
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
 
-  Future<void> _loadMascot() async {
-    try {
-      _riveFile = await File.asset(
-        'assets/zombie.riv',
-        riveFactory: Factory.rive,
-      );
-      _riveController = RiveWidgetController(_riveFile!);
-      setState(() {});
-    } catch (e) {
-      print("Failed to load mascot: $e");
-    }
+    _breatheAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeInOutSine)
+    );
+    _floatAnimation = Tween<double>(begin: -10.0, end: 10.0).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeInOutSine)
+    );
   }
 
   void _triggerInput(String type, String name, dynamic value) {
-    if (_riveController == null) return;
-    try {
-      if (type == 'bool') {
-        _riveController!.stateMachine.boolean(name)?.value = value as bool;
-      } else if (type == 'trigger') {
-        _riveController!.stateMachine.trigger(name)?.fire();
-      }
-    } catch (_) {
-      // Input not found or state machine absent
+    // Legacy Rive hook, now adapted for Flutter animation speed
+    if (name == 'isScanning' && value == true) {
+      _animController.duration = const Duration(milliseconds: 500);
+      _animController.repeat(reverse: true);
+    } else if (name == 'isScanning' && value == false) {
+      _animController.duration = const Duration(seconds: 2);
+      _animController.repeat(reverse: true);
     }
   }
 
   void _showResultSheet(bool isFake, double confidence) {
+     setState(() {
+       _isFakeResult = isFake;
+       _hasResult = true;
+     });
      showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -113,7 +113,10 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> {
         onClose: () {
           Navigator.pop(context);
           setState(() {
-            _resultText = null; // Will fallback to waitingText
+            _resultText = null;
+            _hasResult = false;
+            // Back to idle
+            _triggerInput('bool', 'isScanning', false);
           });
         },
       ),
@@ -197,8 +200,7 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> {
 
   @override
   void dispose() {
-    _riveController?.dispose();
-    _riveFile?.dispose();
+    _animController.dispose();
     super.dispose();
   }
 
@@ -231,17 +233,62 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> {
       drawer: HistoryDrawer(onRestorePurchases: _handleRestorePurchases),
       body: Stack(
         children: [
-          // 1. BACKGROUND MASCOT LAYER (Rive 0.14)
+          // 1. BACKGROUND GRADIENT LAYER
           Positioned.fill(
-            child: _riveController == null 
-              ? const Center(child: CircularProgressIndicator())
-              : RiveWidget(
-                  controller: _riveController!,
-                  fit: Fit.cover,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: _hasResult
+                      ? (_isFakeResult
+                          ? [Colors.red.shade900, Colors.red.shade700]
+                          : [Colors.green.shade900, Colors.green.shade700])
+                      : [const Color(0xFF1E1E2C), const Color(0xFF2D2A4A)],
                 ),
+              ),
+            ),
           ),
           
-          // 2. FOREGROUND GLASSMORPHISM UI LAYER
+          // 2. MASCOT LAYER (Animated Flutter Graphic)
+          Positioned(
+            top: MediaQuery.of(context).size.height * 0.15,
+            left: 0,
+            right: 0,
+            child: AnimatedBuilder(
+              animation: _animController,
+              builder: (context, child) {
+                return Transform.translate(
+                  offset: Offset(0, _floatAnimation.value),
+                  child: Transform.scale(
+                    scale: _breatheAnimation.value,
+                    child: Center(
+                      child: Container(
+                        width: 250,
+                        height: 250,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: (_isLoading ? Colors.cyan : (_hasResult ? (_isFakeResult ? Colors.red : Colors.green) : Colors.purple)).withOpacity(0.5),
+                              blurRadius: _isLoading ? 50 : 30,
+                              spreadRadius: _isLoading ? 20 : 10,
+                            )
+                          ],
+                          image: const DecorationImage(
+                            image: AssetImage('assets/icon.png'),
+                            fit: BoxFit.cover,
+                          )
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          
+          // 3. FOREGROUND GLASSMORPHISM UI LAYER
           SafeArea(
             child: Column(
               children: [
