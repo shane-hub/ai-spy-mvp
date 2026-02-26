@@ -26,6 +26,7 @@ class AiSpyApp extends StatelessWidget {
       valueListenable: appLocale,
       builder: (context, locale, child) {
         return MaterialApp(
+          debugShowCheckedModeBanner: false,
           title: 'AI Spy',
           locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -63,6 +64,9 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> with Single
   String? _resultText; // Set to null initially to allow translation lookup in build()
   bool _isFakeResult = false;
   bool _hasResult = false;
+  
+  // Real History State
+  List<Map<String, dynamic>> _scanHistory = [];
 
   @override
   void initState() {
@@ -124,7 +128,11 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> with Single
   }
 
   Future<void> _pickAndAnalyzeImage(ImageSource source) async {
-    final XFile? image = await _picker.pickImage(source: source);
+    // requestFullMetadata: false prevents 5-10 second iOS 14+ gallery lag
+    final XFile? image = await _picker.pickImage(
+      source: source, 
+      requestFullMetadata: false
+    );
     if (image == null) return;
 
     setState(() {
@@ -138,7 +146,7 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> with Single
     try {
       var request = http.MultipartRequest(
         'POST', 
-        Uri.parse('http://localhost:3001/api/v1/detect')
+        Uri.parse('http://192.168.3.44:3001/api/v1/detect')
       );
       
       request.fields['auth_token'] = 'my_super_secure_client_secret_for_flutter';
@@ -173,6 +181,13 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> with Single
             _triggerInput('trigger', 'approved', null);
             _resultText = AppLocalizations.of(context)!.realToast;
           }
+        });
+        
+        // Add to History
+        _scanHistory.insert(0, {
+          'time': DateTime.now(),
+          'isFake': isFake,
+          'confidence': confidence
         });
         
         // POP THE SHEET
@@ -230,7 +245,10 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> with Single
 
     return Scaffold(
       backgroundColor: const Color(0xFFE8F0FF), // Soft background
-      drawer: HistoryDrawer(onRestorePurchases: _handleRestorePurchases),
+      drawer: HistoryDrawer(
+        onRestorePurchases: _handleRestorePurchases,
+        scanHistory: _scanHistory,
+      ),
       body: Stack(
         children: [
           // 1. BACKGROUND GRADIENT LAYER
@@ -309,14 +327,14 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> with Single
                       
                       _buildGlassContainer(
                         child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(Icons.troubleshoot, color: Colors.indigo),
                               SizedBox(width: 8),
                               Text(
-                                'AI-Spy (MVP)',
+                                'AI-Spy',
                                 style: TextStyle(
                                   fontSize: 24,
                                   fontWeight: FontWeight.w900,

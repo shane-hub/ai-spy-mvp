@@ -4,10 +4,12 @@ import '../l10n/app_localizations.dart';
 
 class HistoryDrawer extends StatelessWidget {
   final VoidCallback onRestorePurchases;
+  final List<Map<String, dynamic>> scanHistory;
 
   const HistoryDrawer({
     super.key,
     required this.onRestorePurchases,
+    required this.scanHistory,
   });
 
   @override
@@ -53,14 +55,34 @@ class HistoryDrawer extends StatelessWidget {
                   ),
                   const Divider(color: Colors.black12, height: 1),
                   
-                  // Mock History List
+                  // Dynamic History List
                   Expanded(
                     child: ListView(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       children: [
-                        _buildHistoryItem(l10n.historyTimeJustNow, l10n.fakeAlertTitle, "88.0%", Colors.red),
-                        _buildHistoryItem(l10n.historyTime2Hrs, l10n.organicTitle, "92.1%", Colors.green),
-                        _buildHistoryItem(l10n.historyTimeYesterday, l10n.fakeAlertTitle, "99.9%", Colors.red),
+                        if (scanHistory.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.all(32.0),
+                            child: Center(
+                              child: Text(
+                                "No scans yet. Try detecting something!",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.black45),
+                              ),
+                            ),
+                          )
+                        else
+                          ...scanHistory.map((item) {
+                            final bool isFake = item['isFake'] as bool;
+                            final double conf = item['confidence'] as double;
+                            // Time formatting simplified for MVP
+                            final String timeStr = l10n.historyTimeJustNow;
+                            final String titleStr = isFake ? l10n.fakeAlertTitle : l10n.organicTitle;
+                            final String confStr = "\${(conf * 100).toStringAsFixed(1)}%";
+                            final Color color = isFake ? Colors.red : Colors.green;
+
+                            return _buildHistoryItem(timeStr, titleStr, confStr, color);
+                          }).toList(),
                         
                         Padding(
                           padding: const EdgeInsets.all(24.0),
