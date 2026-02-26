@@ -150,7 +150,12 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> with Single
       );
       
       request.fields['auth_token'] = 'my_super_secure_client_secret_for_flutter';
-      var multipartFile = await http.MultipartFile.fromPath('image', image.path);
+      var fileBytes = await image.readAsBytes();
+      var multipartFile = http.MultipartFile.fromBytes(
+        'image',
+        fileBytes,
+        filename: image.name.isNotEmpty ? image.name : 'upload.jpg',
+      );
       request.files.add(multipartFile);
 
       var response = await request.send();
