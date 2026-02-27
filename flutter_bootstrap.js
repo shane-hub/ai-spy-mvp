@@ -49,7 +49,7 @@ _flutter.buildConfig = { "engineRevision": "6c0baaebf70e0148f485f27d5616b3d3382d
 
 _flutter.loader.load({
   config: {
-    fontFallbackBaseUrl: "https://fonts.loli.net/s/"
+    fontFallbackBaseUrl: "https://fonts.gstatic.com/s/"
   },
   serviceWorkerSettings: {
     serviceWorkerVersion: "365113819" /* Flutter's service worker is deprecated and will be removed in a future Flutter release. */
