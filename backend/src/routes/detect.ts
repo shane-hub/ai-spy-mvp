@@ -5,10 +5,10 @@ import FormData from 'form-data';
 
 const router = Router();
 
-// 内存中缓存文件，MVP阶段限制大小为 5MB
+// 内存中缓存文件，提升限额为 20MB 适配手机原图
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 }
+    limits: { fileSize: 20 * 1024 * 1024 }
 });
 
 router.post('/detect', upload.single('image'), async (req: Request, res: Response): Promise<void> => {
