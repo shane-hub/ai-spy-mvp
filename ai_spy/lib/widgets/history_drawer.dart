@@ -78,7 +78,7 @@ class HistoryDrawer extends StatelessWidget {
                             // Time formatting simplified for MVP
                             final String timeStr = l10n.historyTimeJustNow;
                             final String titleStr = isFake ? l10n.fakeAlertTitle : l10n.organicTitle;
-                            final String confStr = "\${(conf * 100).toStringAsFixed(1)}%";
+                            final String confStr = "${(conf * 100).toStringAsFixed(1)}%";
                             final Color color = isFake ? Colors.red : Colors.green;
 
                             return _buildHistoryItem(timeStr, titleStr, confStr, color);
