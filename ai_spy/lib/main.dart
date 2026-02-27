@@ -33,6 +33,7 @@ class AiSpyApp extends StatelessWidget {
           supportedLocales: AppLocalizations.supportedLocales,
           theme: ThemeData(
             fontFamily: 'Quicksand',
+            fontFamilyFallback: const ['PingFang SC', 'Heiti SC', 'Microsoft YaHei', 'sans-serif'],
             colorScheme: ColorScheme.fromSeed(
               seedColor: const Color(0xFF8E7BFF),
               brightness: Brightness.light,
@@ -420,22 +421,7 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> with Single
                             ),
                           ),
                           
-                          const SizedBox(height: 12),
-                          
-// ... replacement in the build method ...
-                          // Camera Button
-                          BouncyButton(
-                            onPressed: _isLoading 
-                                ? null 
-                                : () => _pickAndAnalyzeImage(ImageSource.camera),
-                            child: AbsorbPointer(
-                              child: TextButton.icon(
-                                onPressed: () {},
-                                icon: const Icon(Icons.camera_alt, color: Colors.black54),
-                                label: Text(l10n.takePicture, style: const TextStyle(color: Colors.black54)),
-                              ),
-                            ),
-                          )
+                          // Only the main upload button remains
                         ],
                       ),
                     ),
