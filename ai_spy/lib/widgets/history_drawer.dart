@@ -78,7 +78,11 @@ class HistoryDrawer extends StatelessWidget {
                             // Time formatting simplified for MVP
                             final String timeStr = l10n.historyTimeJustNow;
                             final String titleStr = isFake ? l10n.fakeAlertTitle : l10n.organicTitle;
-                            final String confStr = "${(conf * 100).toStringAsFixed(1)}%";
+                            
+                            // If it's organic, the API confidence (e.g., 0.01) means 1% AI / 99% Organic. 
+                            // We should show the Organic confidence (99.0%) next to the Organic title.
+                            final double displayScore = isFake ? conf : (1.0 - conf);
+                            final String confStr = "${(displayScore * 100).toStringAsFixed(1)}%";
                             final Color color = isFake ? Colors.red : Colors.green;
 
                             return _buildHistoryItem(timeStr, titleStr, confStr, color);
