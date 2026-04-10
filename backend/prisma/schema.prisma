@@ -1,0 +1,95 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AuthProvider {
+  WECHAT
+  GMAIL
+  PHONE
+  EMAIL
+}
+
+model User {
+  id                String         @id @default(uuid()) @db.Uuid
+  authProvider      AuthProvider   @map("auth_provider")
+  providerUid       String         @map("provider_uid")
+  displayName       String?        @map("display_name")
+  email             String?
+  avatarUrl         String?        @map("avatar_url")
+  availableCredits  Int            @default(3) @map("available_credits")
+  deviceToken       String?        @map("device_token")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  creditsLedgers    CreditsLedger[]
+  orders            Order[]
+  scanHistories     ScanHistory[]
+
+  @@unique([authProvider, providerUid])
+  @@map("users")
+}
+
+enum TransactionType {
+  SIGNUP_GIFT
+  PURCHASE_RECHARGE
+  DETECT_CONSUME
+  DETECT_REFUND
+  AD_REWARD
+}
+
+model CreditsLedger {
+  id              String          @id @default(uuid()) @db.Uuid
+  userId          String          @map("user_id") @db.Uuid
+  user            User            @relation(fields: [userId], references: [id])
+  transactionType TransactionType @map("transaction_type")
+  amount          Int
+  referenceId     String?         @map("reference_id")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  @@map("credits_ledger")
+}
+
+enum PackageType {
+  BASIC_10
+  PRO_50
+}
+
+enum OrderStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model Order {
+  orderNo         String      @id @map("order_no")
+  userId          String      @map("user_id") @db.Uuid
+  user            User        @relation(fields: [userId], references: [id])
+  packageType     PackageType @map("package_type")
+  status          OrderStatus @default(PENDING)
+  amountCents     Int         @map("amount_cents")
+  thirdPartyTxId  String?     @unique @map("third_party_tx_id")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  paidAt          DateTime?   @map("paid_at")
+
+  @@map("orders")
+}
+
+model ScanHistory {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  user            User     @relation(fields: [userId], references: [id])
+  imageUrl        String   @map("image_url")
+  isFake          Boolean  @map("is_fake")
+  confidenceScore Float    @map("confidence_score")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("scan_history")
+}

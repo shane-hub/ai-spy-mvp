@@ -3,12 +3,10 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 
 class HistoryDrawer extends StatelessWidget {
-  final VoidCallback onRestorePurchases;
   final List<Map<String, dynamic>> scanHistory;
 
   const HistoryDrawer({
     super.key,
-    required this.onRestorePurchases,
     required this.scanHistory,
   });
 
@@ -111,23 +109,6 @@ class HistoryDrawer extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context); // close drawer
-                            onRestorePurchases();
-                          },
-                          icon: const Icon(Icons.restore),
-                          label: Text(l10n.restorePurchases),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.indigo.shade50,
-                            foregroundColor: Colors.indigo,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)
-                            )
-                          ),
-                        ),
-                        const SizedBox(height: 12),
                         Text(
                           l10n.appVersionLabel,
                           textAlign: TextAlign.center,

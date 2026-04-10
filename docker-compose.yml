@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgresql://admin:password@postgres:5432/ai_spy_db?schema=public
+      - REDIS_URL=redis://redis:6379
+      # Security Keys (Add to production environment manually or pass via env file)
+      - ADMIN_PASSWORD=secret
+      - JWT_SECRET=super_secret_key_for_ai_spy_jwt
+      - ADMIN_JWT_SECRET=super_secret_admin_key_for_ai_spy
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ai_spy_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:

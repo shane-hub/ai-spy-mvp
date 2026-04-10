@@ -41,6 +41,7 @@ dependencies:
   http: ^1.6.0
   shared_preferences: ^2.5.4
   rive: ^0.14.3
+  uuid: ^4.5.3
 
 dev_dependencies:
   flutter_test:

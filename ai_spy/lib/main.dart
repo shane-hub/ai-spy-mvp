@@ -4,10 +4,13 @@ import 'l10n/app_localizations.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 import 'widgets/bouncy_button.dart';
 import 'widgets/result_sheet.dart';
 import 'widgets/history_drawer.dart';
+import 'widgets/paywall_dialog.dart';
 
 void main() {
   runApp(const AiSpyApp());
@@ -128,6 +131,31 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> with Single
     );
   }
 
+  void _showPaywall() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.8),
+      builder: (context) => PaywallDialog(
+        onLoginPressed: () {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mock Login: WeChat / Gmail...')));
+        },
+        onPurchaseBasic: () {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mock Payment: ¥1.99 Pack...')));
+        },
+        onPurchasePro: () {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mock Payment: ¥19.9 Pro...')));
+        },
+        onWatchAd: () {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mock Video Ad Playing...')));
+        },
+      ),
+    );
+  }
+
   Future<void> _pickAndAnalyzeImage(ImageSource source) async {
     // requestFullMetadata: false prevents 5-10 second iOS 14+ gallery lag
     final XFile? image = await _picker.pickImage(
@@ -147,7 +175,7 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> with Single
     try {
       var request = http.MultipartRequest(
         'POST', 
-        Uri.parse('https://ai-spy-3owq.onrender.com/api/v1/detect')
+        Uri.parse('http://127.0.0.1:3000/api/v1/detect') // 切换为本地测试环境
       );
       
       request.fields['auth_token'] = 'my_super_secure_client_secret_for_flutter';
@@ -159,7 +187,17 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> with Single
       );
       request.files.add(multipartFile);
 
-      var response = await request.send();
+      // Attach Device ID for Guest Mode tracking
+      final prefs = await SharedPreferences.getInstance();
+      String? deviceId = prefs.getString('x_device_id');
+      if (deviceId == null) {
+        deviceId = const Uuid().v4();
+        await prefs.setString('x_device_id', deviceId);
+      }
+      request.headers['X-Device-ID'] = deviceId;
+      // TODO: Attach Bearer Token if logged in
+
+      var response = await request.send().timeout(const Duration(seconds: 20));
       
       if (response.statusCode == 200) {
         String responseStr = await response.stream.bytesToString();
@@ -199,6 +237,16 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> with Single
         // POP THE SHEET
         _showResultSheet(isFake, confidence);
         
+      } else if (response.statusCode == 402) {
+         // Guest limit exceeded or out of credits
+         setState(() {
+            _triggerInput('bool', 'isChecking', false);
+            _triggerInput('bool', 'isScanning', false);
+            _triggerInput('trigger', 'fail', null);
+            _triggerInput('trigger', 'confused', null);
+            _resultText = "Free trial exceeded! Please unlock.";
+         });
+         _showPaywall();
       } else {
         String respBody = await response.stream.bytesToString();
         throw Exception("HTTP ${response.statusCode}: $respBody");
@@ -225,24 +273,6 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> with Single
     super.dispose();
   }
 
-// add import at top of main.dart
-  void _handleRestorePurchases() {
-    // Show a mock loading indicator and then success
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-    Future.delayed(const Duration(seconds: 2), () {
-      Navigator.pop(context); // close dialog
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Purchases Restored Successfully!'),
-          backgroundColor: Colors.green,
-        )
-      );
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -252,7 +282,6 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> with Single
     return Scaffold(
       backgroundColor: const Color(0xFFE8F0FF), // Soft background
       drawer: HistoryDrawer(
-        onRestorePurchases: _handleRestorePurchases,
         scanHistory: _scanHistory,
       ),
       body: Stack(
@@ -414,7 +443,8 @@ class _MascotDetectorScreenState extends State<MascotDetectorScreen> with Single
                                     shadowColor: const Color(0xFF8E7BFF).withOpacity(0.5),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(20)
-                                    )
+                                    ),
+                                    splashFactory: NoSplash.splashFactory, // 禁用点击时的圆形波纹效果
                                   ),
                                 ),
                               ),
