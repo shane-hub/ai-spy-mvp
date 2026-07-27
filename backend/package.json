@@ -4,9 +4,10 @@
   "description": "Secure proxy for AI detection MVP",
   "main": "dist/app.js",
   "scripts": {
-    "start": "npx prisma db push --accept-data-loss && node dist/app.js",
+    "start": "node dist/app.js",
     "build": "tsc",
-    "dev": "npx prisma db push --accept-data-loss && ts-node src/app.ts"
+    "dev": "ts-node src/app.ts",
+    "db:push": "prisma db push --accept-data-loss"
   },
   "dependencies": {
     "@contentauth/c2pa-node": "0.7.0",
