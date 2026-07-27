@@ -1,9 +1,22 @@
-import Redis from 'ioredis';
+import Redis from "ioredis";
 
-// Attempt to connect to local or docker redis
-const redis = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6379');
+const redisUrl = process.env.REDIS_URL?.trim();
+const redis = redisUrl
+  ? new Redis(redisUrl, {
+      enableOfflineQueue: false,
+      maxRetriesPerRequest: 1,
+    })
+  : null;
 
-redis.on('error', (err) => console.error('Redis Client Error', err));
-redis.on('connect', () => console.log('Redis Client Connected'));
+if (redis) {
+  redis.on("error", (error) =>
+    console.error("Redis Client Error", error.message),
+  );
+  redis.on("connect", () => console.log("Redis Client Connected"));
+} else {
+  console.warn(
+    "REDIS_URL is not configured; guest requests use an in-memory sandbox limiter.",
+  );
+}
 
 export default redis;
