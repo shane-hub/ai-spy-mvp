@@ -161,6 +161,10 @@ router.post(
           return;
         }
         directScanId = directTicket.scan_id;
+        await storeDirectResult(directScanId, {
+          code: 202,
+          status: "processing",
+        });
       }
 
       const userId = req.user?.userId;
