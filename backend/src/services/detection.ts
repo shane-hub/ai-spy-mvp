@@ -235,18 +235,29 @@ async function callSightengine(input: ImageInput) {
     throw new Error("SIGHTENGINE_NOT_CONFIGURED");
   }
 
-  let deepfakeAvailable = true;
+  const requestedModels =
+    process.env.SIGHTENGINE_MODELS?.trim() || "genai";
+  let deepfakeAvailable = requestedModels
+    .split(",")
+    .map((model) => model.trim())
+    .includes("deepfake");
   let response;
   try {
     response = await submitSightengine(
       input,
       apiUser,
       apiSecret,
-      "genai,deepfake",
+      requestedModels,
     );
   } catch (error) {
     const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-    if (!status || ![400, 402, 403, 422].includes(status)) throw error;
+    if (
+      !deepfakeAvailable ||
+      !status ||
+      ![400, 402, 403, 422].includes(status)
+    ) {
+      throw error;
+    }
     console.warn(
       `Sightengine deepfake model unavailable (${status}); retrying genai only.`,
     );
