@@ -29,6 +29,7 @@ export type ProviderSignal = {
   provider: "sightengine";
   ai_generated_or_edited_score: number;
   deepfake_score: number;
+  deepfake_available?: boolean;
   suspected_generator?: string;
 };
 
@@ -202,22 +203,21 @@ export async function inspectC2pa(
   }
 }
 
-async function callSightengine(input: ImageInput) {
-  const apiUser = process.env.SIGHTENGINE_API_USER;
-  const apiSecret = process.env.SIGHTENGINE_API_SECRET;
-  if (!apiUser || !apiSecret) {
-    throw new Error("SIGHTENGINE_NOT_CONFIGURED");
-  }
-
+async function submitSightengine(
+  input: ImageInput,
+  apiUser: string,
+  apiSecret: string,
+  models: string,
+) {
   const data = new FormData();
-  data.append("models", "genai,deepfake");
+  data.append("models", models);
   data.append("api_user", apiUser);
   data.append("api_secret", apiSecret);
   data.append("media", input.buffer, {
     filename: input.filename,
     contentType: input.mimetype,
   });
-  const response = await axios.post(
+  return axios.post(
     "https://api.sightengine.com/1.0/check.json",
     data,
     {
@@ -226,6 +226,33 @@ async function callSightengine(input: ImageInput) {
       maxBodyLength: 21 * 1024 * 1024,
     },
   );
+}
+
+async function callSightengine(input: ImageInput) {
+  const apiUser = process.env.SIGHTENGINE_API_USER;
+  const apiSecret = process.env.SIGHTENGINE_API_SECRET;
+  if (!apiUser || !apiSecret) {
+    throw new Error("SIGHTENGINE_NOT_CONFIGURED");
+  }
+
+  let deepfakeAvailable = true;
+  let response;
+  try {
+    response = await submitSightengine(
+      input,
+      apiUser,
+      apiSecret,
+      "genai,deepfake",
+    );
+  } catch (error) {
+    const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+    if (!status || ![400, 402, 403, 422].includes(status)) throw error;
+    console.warn(
+      `Sightengine deepfake model unavailable (${status}); retrying genai only.`,
+    );
+    deepfakeAvailable = false;
+    response = await submitSightengine(input, apiUser, apiSecret, "genai");
+  }
   const raw = response.data as {
     type?: {
       ai_generated?: number;
@@ -242,6 +269,7 @@ async function callSightengine(input: ImageInput) {
       provider: "sightengine",
       ai_generated_or_edited_score: clamp(raw.type?.ai_generated),
       deepfake_score: clamp(raw.type?.deepfake),
+      deepfake_available: deepfakeAvailable,
       suspected_generator:
         generators[0] && clamp(generators[0][1]) >= 0.25
           ? generators[0][0]
