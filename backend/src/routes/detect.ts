@@ -11,6 +11,11 @@ import { analyzeImage } from "../services/detection";
 
 const router = Router();
 const ACCEPTED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const GUEST_LIMIT_TTL_SECONDS = 365 * 24 * 60 * 60;
+const guestMemoryLimits = new Map<
+  string,
+  { count: number; expiresAt: number }
+>();
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -26,6 +31,34 @@ function matchesClientSecret(candidate: unknown) {
     candidateBuffer.length === expectedBuffer.length &&
     timingSafeEqual(candidateBuffer, expectedBuffer)
   );
+}
+
+async function consumeGuestTrial(deviceId: string) {
+  const key = `rate_limit:detect:device:${deviceId}`;
+  if (redis) {
+    const usages = await redis.incr(key);
+    if (usages === 1) await redis.expire(key, GUEST_LIMIT_TTL_SECONDS);
+    return usages;
+  }
+
+  const now = Date.now();
+  const existing = guestMemoryLimits.get(key);
+  const next = !existing || existing.expiresAt <= now
+    ? { count: 1, expiresAt: now + GUEST_LIMIT_TTL_SECONDS * 1000 }
+    : { ...existing, count: existing.count + 1 };
+  guestMemoryLimits.set(key, next);
+
+  if (guestMemoryLimits.size > 5_000) {
+    for (const [storedKey, value] of guestMemoryLimits) {
+      if (value.expiresAt <= now) guestMemoryLimits.delete(storedKey);
+    }
+    while (guestMemoryLimits.size > 5_000) {
+      const oldestKey = guestMemoryLimits.keys().next().value;
+      if (typeof oldestKey !== "string") break;
+      guestMemoryLimits.delete(oldestKey);
+    }
+  }
+  return next.count;
 }
 
 router.post(
@@ -48,9 +81,12 @@ router.post(
       const isTrustedProxy = matchesClientSecret(req.body?.auth_token);
 
       if (!isTrustedProxy && req.isGuest) {
-        const deviceId = req.deviceId;
-        const guestLimitKey = `rate_limit:detect:device:${deviceId}`;
-        const usages = await redis.incr(guestLimitKey);
+        const deviceId = req.deviceId || req.ip;
+        if (!deviceId) {
+          res.status(400).json({ code: 400, msg: "Missing device identity" });
+          return;
+        }
+        const usages = await consumeGuestTrial(deviceId);
         if (usages > 1) {
           res
             .status(402)
@@ -60,7 +96,6 @@ router.post(
             });
           return;
         }
-        await redis.expire(guestLimitKey, 365 * 24 * 60 * 60);
       } else if (!isTrustedProxy && userId) {
         try {
           await prisma.$transaction(async (tx: any) => {
