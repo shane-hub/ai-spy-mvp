@@ -1,18 +1,32 @@
 import nodemailer from 'nodemailer';
 
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.ethereal.email',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
+const getRequiredEnv = (name: string): string => {
+    const value = process.env[name]?.trim();
+    if (!value) {
+        throw new Error(`Missing required SMTP environment variable: ${name}`);
     }
-});
+    return value;
+};
 
 export const sendOtpEmail = async (to: string, otp: string) => {
+    const smtpHost = process.env.SMTP_HOST?.trim() || 'smtp.gmail.com';
+    const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+    const smtpSecure = process.env.SMTP_SECURE === 'true';
+    const smtpUser = getRequiredEnv('SMTP_USER');
+    const smtpPass = getRequiredEnv('SMTP_PASS');
+
+    const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpSecure,
+        auth: {
+            user: smtpUser,
+            pass: smtpPass
+        }
+    });
+
     const info = await transporter.sendMail({
-        from: `"AI Spy Team" <${process.env.SMTP_USER || 'no-reply@aispy.com'}>`,
+        from: `"AI Spy Team" <${smtpUser}>`,
         to,
         subject: 'Your AI Spy Login Code',
         text: `Your login verification code is: ${otp}. It will expire in 5 minutes.`,
