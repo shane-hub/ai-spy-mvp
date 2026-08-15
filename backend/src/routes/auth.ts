@@ -20,10 +20,17 @@ router.post('/send-otp', async (req: Request, res: Response) => {
         }
 
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        // Set OTP with 5 mins expiry
+        // Set OTP with 5 mins expiry before sending so parallel requests are blocked.
         await redis.set(`otp:${email}`, otp, 'EX', 300);
 
-        await sendOtpEmail(email, otp);
+        try {
+            await sendOtpEmail(email, otp);
+        } catch (emailError) {
+            // If SMTP delivery fails, remove the OTP immediately so the user can retry
+            // after the mail configuration or transient delivery issue is fixed.
+            await redis.del(`otp:${email}`);
+            throw emailError;
+        }
 
         res.status(200).json({ code: 200, msg: 'OTP sent successfully' });
     } catch (err: any) {
