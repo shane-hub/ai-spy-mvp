@@ -5,6 +5,7 @@ import { authenticateToken, AuthRequest } from '../middlewares/auth';
 import { AuthProvider } from '@prisma/client';
 import redis from '../utils/redis';
 import { sendOtpEmail } from '../utils/email';
+import { verifyGoogleIdToken } from '../utils/googleAuth';
 
 const router = Router();
 
@@ -41,7 +42,7 @@ router.post('/send-otp', async (req: Request, res: Response) => {
 
 router.post('/login', async (req: Request, res: Response) => {
     try {
-        const { provider, access_token, id_token, email: payloadEmail, otp } = req.body;
+        const { provider, id_token, email: payloadEmail, otp } = req.body;
 
         if (!provider) {
             return res.status(400).json({ code: 400, msg: 'Missing credentials' });
@@ -50,18 +51,25 @@ router.post('/login', async (req: Request, res: Response) => {
         let providerUid = '';
         let email = null;
         let displayName = null;
+        let avatarUrl = null;
 
-        // Simulate third party SDK validation
-        if (provider === 'WECHAT') {
-            providerUid = `mock_wx_${Math.random().toString(36).substring(7)}`;
-            displayName = 'WeChat User';
-        } else if (provider === 'GMAIL') {
-            providerUid = `mock_g_${Math.random().toString(36).substring(7)}`;
-            email = 'mock@gmail.com';
-            displayName = 'Google User';
-        } else if (provider === 'PHONE') {
-            providerUid = access_token || `phone_${Math.random().toString(36).substring(7)}`;
-            displayName = `用户_${providerUid.substring(0, 4)}***`;
+        if (provider === 'GMAIL') {
+            if (typeof id_token !== 'string' || !id_token) {
+                return res.status(400).json({ code: 400, msg: 'Google ID token is required' });
+            }
+            const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
+            if (!googleClientId) {
+                return res.status(503).json({ code: 503, msg: 'Google login is not configured' });
+            }
+            try {
+                const identity = await verifyGoogleIdToken(id_token, googleClientId);
+                providerUid = identity.providerUid;
+                email = identity.email;
+                displayName = identity.displayName;
+                avatarUrl = identity.avatarUrl;
+            } catch {
+                return res.status(401).json({ code: 401, msg: 'Invalid Google ID token' });
+            }
         } else if (provider === 'EMAIL') {
             if (!payloadEmail || !otp) return res.status(400).json({ code: 400, msg: 'Email and OTP required' });
             const savedOtp = await redis.get(`otp:${payloadEmail}`);
@@ -95,6 +103,7 @@ router.post('/login', async (req: Request, res: Response) => {
                     providerUid,
                     displayName,
                     email,
+                    avatarUrl,
                     availableCredits: 3 // Default 3 credits on signup
                 }
             });

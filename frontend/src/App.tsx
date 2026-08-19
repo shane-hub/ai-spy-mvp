@@ -116,8 +116,13 @@ function App() {
     setMascotState('scanning');
 
     try {
+      const userToken = localStorage.getItem('user_token');
       const res = await axios.post('/api/v1/detect', formData, {
-        headers: { 'Content-Type': 'multipart/form-data', 'X-Device-ID': deviceId }
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'X-Device-ID': deviceId,
+          ...(userToken ? { Authorization: `Bearer ${userToken}` } : {})
+        }
       });
 
       const payload = res.data.data;
@@ -369,6 +374,20 @@ function App() {
             } catch (e: any) {
               alert(e.response?.data?.msg || 'Login Failed');
               throw e; // throw to let PaywallDialog know it failed
+            }
+          }}
+          onGoogleLogin={async (idToken) => {
+            try {
+              const res = await axios.post('/api/v1/auth/login', {
+                provider: 'GMAIL',
+                id_token: idToken,
+              });
+              localStorage.setItem('user_token', res.data.data.token);
+              alert(lang === 'zh' ? '✅ Google 登录成功！已获得 3 次检测。' : '✅ Google login successful! You received 3 scans.');
+            } catch (e: unknown) {
+              const message = axios.isAxiosError(e) ? e.response?.data?.msg || 'Google Login Failed' : 'Google Login Failed';
+              alert(message);
+              throw new Error(message);
             }
           }}
           onPurchaseBasic={async () => {

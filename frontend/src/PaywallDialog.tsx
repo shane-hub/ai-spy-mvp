@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Award, Zap, Star, PlayCircle, X, Mail, ArrowRight, Loader2, QrCode } from 'lucide-react';
 import axios from 'axios';
 import { QRCodeSVG } from 'qrcode.react';
@@ -6,6 +6,7 @@ import { QRCodeSVG } from 'qrcode.react';
 interface PaywallDialogProps {
     onClose: () => void;
     onLogin: (email: string, otp: string) => Promise<void>;
+    onGoogleLogin: (idToken: string) => Promise<void>;
     onPurchaseBasic: () => Promise<string | undefined>;
     onPurchasePro: () => Promise<string | undefined>;
     onWatchAd: () => void;
@@ -17,7 +18,7 @@ const dict = {
         title: "Unlock AI Spy",
         subtitle: "Get the ultimate truth with deep analysis.",
         loginTitle: "Login for 3 Scans",
-        loginSub: "Email OTP only",
+        loginSub: "Email code or Google",
         basicTitle: "10 Scans Pack",
         basicSub: "¥1.99 - One time",
         proTitle: "Unlimited Scans (Monthly)",
@@ -34,7 +35,7 @@ const dict = {
         title: "解锁 AI 侦探",
         subtitle: "获取深度分析，揭开最终真相",
         loginTitle: "登录解锁 3 次检测",
-        loginSub: "仅需邮箱验证码",
+        loginSub: "邮箱验证码或 Google 登录",
         basicTitle: "10 次检测加油包",
         basicSub: "¥1.99 - 一次性购买",
         proTitle: "包月无限次检测 (PRO)",
@@ -52,6 +53,7 @@ const dict = {
 export const PaywallDialog: React.FC<PaywallDialogProps> = ({
     onClose,
     onLogin,
+    onGoogleLogin,
     onPurchaseBasic,
     onPurchasePro,
     onWatchAd,
@@ -66,6 +68,57 @@ export const PaywallDialog: React.FC<PaywallDialogProps> = ({
     const [sending, setSending] = useState(false);
     const [loggingIn, setLoggingIn] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
+    const googleButtonRef = useRef<HTMLDivElement>(null);
+    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+    useEffect(() => {
+        if (!googleClientId || step !== 'options') return;
+
+        const renderButton = () => {
+            if (!window.google || !googleButtonRef.current) return;
+            window.google.accounts.id.initialize({
+                client_id: googleClientId,
+                callback: async ({ credential }) => {
+                    if (!credential) return;
+                    setErrorMsg('');
+                    setLoggingIn(true);
+                    try {
+                        await onGoogleLogin(credential);
+                    } catch (err: unknown) {
+                        setErrorMsg(err instanceof Error ? err.message : 'Google login failed');
+                    } finally {
+                        setLoggingIn(false);
+                    }
+                }
+            });
+            googleButtonRef.current.replaceChildren();
+            window.google.accounts.id.renderButton(googleButtonRef.current, {
+                type: 'standard',
+                theme: 'outline',
+                size: 'large',
+                text: 'continue_with',
+                shape: 'pill',
+                width: Math.min(320, googleButtonRef.current.clientWidth || 320),
+                locale: lang === 'zh' ? 'zh_CN' : 'en'
+            });
+        };
+
+        if (window.google) {
+            renderButton();
+            return;
+        }
+
+        let script = document.querySelector<HTMLScriptElement>('script[data-google-identity]');
+        if (!script) {
+            script = document.createElement('script');
+            script.src = 'https://accounts.google.com/gsi/client';
+            script.async = true;
+            script.dataset.googleIdentity = 'true';
+            document.head.appendChild(script);
+        }
+        script.addEventListener('load', renderButton);
+        return () => script?.removeEventListener('load', renderButton);
+    }, [googleClientId, lang, onGoogleLogin, step]);
 
     useEffect(() => {
         let timer: ReturnType<typeof setTimeout>;
@@ -164,6 +217,19 @@ export const PaywallDialog: React.FC<PaywallDialogProps> = ({
                                     </div>
                                 </div>
                             </button>
+
+                            {googleClientId && (
+                                <>
+                                    <div className="flex items-center gap-3 text-white/40 text-xs">
+                                        <div className="h-px flex-1 bg-white/10" />
+                                        <span>{lang === 'zh' ? '或' : 'OR'}</span>
+                                        <div className="h-px flex-1 bg-white/10" />
+                                    </div>
+                                    <div ref={googleButtonRef} className="flex min-h-10 justify-center" />
+                                </>
+                            )}
+
+                            {errorMsg && <div className="text-rose-400 text-sm text-center font-medium bg-rose-500/10 py-2 rounded-lg">{errorMsg}</div>}
 
                             {/* US3: Basic Recharge */}
                             <button
